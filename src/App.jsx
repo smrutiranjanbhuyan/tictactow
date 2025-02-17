@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from "react";
 
-// Minimax algorithm to find the best move
-const minimax = (board, depth, isMaximizing) => {
+
+const minimax = (board, depth, isMaximizing, botSymbol, playerSymbol) => {
   const winner = checkWinner(board);
-  if (winner === "X") return { score: 1 }; // Bot wins
-  if (winner === "O") return { score: -1 }; // Player wins
-  if (board.every(cell => cell !== "")) return { score: 0 }; // Tie
+  if (winner === botSymbol) return { score: 1 };
+  if (winner === playerSymbol) return { score: -1 };
+  if (board.every(cell => cell !== "")) return { score: 0 };
 
   const emptyCells = board
     .map((value, index) => (value === "" ? index : -1))
-    .filter((index) => index !== -1);
+    .filter(index => index !== -1);
 
   let bestMove = { score: isMaximizing ? -Infinity : Infinity };
   for (let index of emptyCells) {
     let newBoard = [...board];
-    newBoard[index] = isMaximizing ? "X" : "O"; // Bot plays X, player plays O
+    newBoard[index] = isMaximizing ? botSymbol : playerSymbol;
 
-    const result = minimax(newBoard, depth + 1, !isMaximizing);
+    const result = minimax(newBoard, depth + 1, !isMaximizing, botSymbol, playerSymbol);
 
     if (isMaximizing) {
       if (result.score > bestMove.score) bestMove = { index, score: result.score };
@@ -38,75 +38,76 @@ const checkWinner = (board) => {
 
   for (let [a, b, c] of winningCombinations) {
     if (board[a] && board[a] === board[b] && board[b] === board[c]) {
-      return board[a]; // 'X' or 'O'
+      return board[a];
     }
   }
 
   if (board.every(cell => cell !== "")) {
-    return "Tie"; // Board is full and no winner, it's a tie
+    return "Tie";
   }
 
-  return null; // No winner yet
+  return null;
 };
 
 function App() {
   const [board, setBoard] = useState(Array(9).fill(""));
-  const [turn, setTurn] = useState(false); // False for player, True for bot
+  const [turn, setTurn] = useState(null); // Null until symbol is chosen
   const [winner, setWinner] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
-  const [history, setHistory] = useState([]);
   const [playerNames, setPlayerNames] = useState({ player1: "Player 1", player2: "Bot" });
+  const [playerSymbol, setPlayerSymbol] = useState("");
+  const [botSymbol, setBotSymbol] = useState("");
 
+  // Handle cell click
   const handleClick = (index) => {
-    if (board[index] || winner) return;
+    if (board[index] || winner || turn) return;
 
     let newBoard = [...board];
-    newBoard[index] = "O"; // Player 1's move
+    newBoard[index] = playerSymbol;
     setBoard(newBoard);
-    setHistory([...history, { board: newBoard, turn: !turn }]);
 
     const gameResult = checkWinner(newBoard);
-    if (gameResult === "O") {
-      setWinner("O");
-    } else if (gameResult === "X") {
-      setWinner("X");
-    } else if (gameResult === "Tie") {
-      setWinner("Tie");
+    if (gameResult) {
+      setWinner(gameResult);
     } else {
-      setTurn(true); // Switch to bot's turn
+      setTurn(true);
     }
   };
 
-  const botMove = async () => {
+  // Bot's move logic
+  const botMove = () => {
     const emptyCells = board
       .map((value, index) => (value === "" ? index : -1))
-      .filter((index) => index !== -1);
+      .filter(index => index !== -1);
 
     if (emptyCells.length > 0) {
-      const bestMove = minimax(board, 0, true); // Bot maximizes the score
+      const bestMove = minimax(board, 0, true, botSymbol, playerSymbol);
       let newBoard = [...board];
-      newBoard[bestMove.index] = "X"; // Bot's move (X)
+      newBoard[bestMove.index] = botSymbol;
       setBoard(newBoard);
-      setHistory([...history, { board: newBoard, turn: !turn }]);
 
       const gameResult = checkWinner(newBoard);
-      if (gameResult === "X") {
-        setWinner("X");
-      } else if (gameResult === "O") {
-        setWinner("O");
-      } else if (gameResult === "Tie") {
-        setWinner("Tie");
+      if (gameResult) {
+        setWinner(gameResult);
       } else {
-        setTurn(false); // Switch to player's turn
+        setTurn(false);
       }
     }
   };
 
+  // Manage bot's turn
   useEffect(() => {
     if (turn && !winner) {
-      botMove(); // Trigger bot move
+      botMove();
     }
   }, [turn, board, winner]);
+
+  // Handle symbol selection
+  const handleSymbolSelection = (symbol) => {
+    setPlayerSymbol(symbol);
+    setBotSymbol(symbol === "X" ? "O" : "X");
+    setTurn(symbol === "X" ? false : true); 
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -121,10 +122,26 @@ function App() {
               onChange={(e) => setPlayerNames({ ...playerNames, player1: e.target.value })}
               className="p-2 rounded-lg text-black w-full"
             />
+            <h2 className="text-xl">Choose Your Symbol:</h2>
+            <div className="flex justify-center space-x-4">
+              <button
+                className={`px-6 py-2 rounded-lg ${playerSymbol === "X" ? "bg-blue-500" : "bg-gray-700"}`}
+                onClick={() => handleSymbolSelection("X")}
+              >
+                X
+              </button>
+              <button
+                className={`px-6 py-2 rounded-lg ${playerSymbol === "O" ? "bg-blue-500" : "bg-gray-700"}`}
+                onClick={() => handleSymbolSelection("O")}
+              >
+                O
+              </button>
+            </div>
           </div>
           <button
             className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg"
             onClick={() => setGameStarted(true)}
+            disabled={!playerSymbol}
           >
             Start Game
           </button>
@@ -148,7 +165,7 @@ function App() {
           </div>
           {winner && (
             <div className="mt-4 text-2xl font-bold text-green-400">
-              {winner === "Tie" ? "It's a tie!" : `Winner: ${winner === "X" ? playerNames.player2 : playerNames.player1}`}
+              {winner === "Tie" ? "It's a tie!" : `Winner: ${winner === playerSymbol ? playerNames.player1 : playerNames.player2}`}
             </div>
           )}
           <button
@@ -156,9 +173,10 @@ function App() {
             onClick={() => {
               setBoard(Array(9).fill(""));
               setWinner(null);
-              setTurn(false);
-              setHistory([]);
+              setTurn(null);
               setGameStarted(false);
+              setPlayerSymbol("");
+              setBotSymbol("");
             }}
           >
             Restart Game
